@@ -1,15 +1,34 @@
 # -*- coding: utf-8 -*-
 import re
-
+from urllib import parse
 import scrapy
+from scrapy import Request
 
 
 class JobboleSpider(scrapy.Spider):
     name = 'jobbole'
     allowed_domains = ['blog.jobbole.com']
-    start_urls = ['http://blog.jobbole.com/113744/']
+    start_urls = ['http://blog.jobbole.com/all-posts/']
 
     def parse(self, response):
+        '''
+        1. 获取文章列表页中的文章url并交给scrapy进行解析
+        2. 获取下一页的url并交给scrapy进行下载
+        '''
+
+        # 解析所有文章页的url进行下载与解析
+        post_urls = response.css("#archive .floated-thumb .post-thumb a::attr(href)").extract()
+        for post_url in post_urls:
+            yield Request(url=parse.urljoin(response.url, post_url), callback=self.parse_detail)
+
+        # 提取下一页并交给scrapy进行下载
+        next_url = response.css(".next.page-numbers::attr(href)").extract_first()
+        if next_url:
+            yield Request(url=parse.urljoin(response.url, next_url), callback=self.parse)
+
+
+    def parse_detail(self, response):
+        # 提取文章的具体字段
         title = response.xpath('//*[@class="entry-header"]/h1/text()').extract_first().strip()
         # extract_first() 相当于 extract()[0]且自带默认空值，不会报错
         # css选择器写法 response.css(".entry-header h1::text").extract_first().strip()
